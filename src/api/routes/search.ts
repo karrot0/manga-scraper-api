@@ -42,11 +42,17 @@ searchRouter.get('/:id/search', withProvider, asyncHandler(async (req, res) => {
     } catch { /* ignore */ }
   }
 
-  const result = await instance.getSearchResults(
-    { title: q, filters },
-    { page },
-    sortingOption,
-  )
+  let result
+  try {
+    result = await instance.getSearchResults(
+      { title: q, filters },
+      { page },
+      sortingOption,
+    )
+  } catch (e: any) {
+    console.error('[search] error stack:', e.stack ?? e.message)
+    throw e
+  }
 
   res.json(result)
 }))

@@ -3,8 +3,12 @@
   "license": "MIT",
   "repository": {},
   "description": "Scraper manga, manhua, manhwa sites, uses recently updated extension repos as providers.",
-  "author": {"name": "Karrot"},
-  "maintainers": ["Karrot"],
+  "author": {
+    "name": "Karrot"
+  },
+  "maintainers": [
+    "Karrot"
+  ],
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -13,18 +17,25 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
     "@paperback/types": "1.0.0-alpha.64",
     "@supabase/supabase-js": "^2.100.0",
     "cheerio": "^1.0.0",
     "dotenv": "^17.3.1",
+    "esbuild": "^0.27.4",
     "express": "^4.21.0",
     "htmlparser2": "^9.1.0",
+    "lucide-react": "^1.7.0",
     "node-fetch": "^3.3.2",
-    "playwright": "^1.58.2"
+    "playwright": "^1.58.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

@@ -5,6 +5,14 @@
 
 Manga Scraper API is a scraper that uses external updated extensions and provides a run time.
 
+## Features
+
+> Scraper
+> Dashboard
+> Database
+> API
+> MCP
+
 ## Installation
 
 ```bash
@@ -15,6 +23,20 @@ Manga Scraper API is a scraper that uses external updated extensions and provide
 
 ```bash
 # bun start
+```
+
+## MCP
+
+Start the server and add to your mcp.json
+
+```
+{
+  "mcpServers": {
+    "manga-scraper": {
+      "url": "http://localhost:3001/mcp"
+    }
+  }
+}
 ```
 
 ## Contributing

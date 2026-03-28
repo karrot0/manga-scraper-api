@@ -1,5 +1,10 @@
 {
-  "disabledExtensions": [],
+  "disabledExtensions": [
+    "Mangabuddy",
+    "Batcave",
+    "ReadAllComics",
+    "ReadComicsOnline"
+  ],
   "extensionSources": [
     {
       "repoId": "kakarot",

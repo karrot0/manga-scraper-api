@@ -6,10 +6,13 @@
  */
 
 import nodeFetch from 'node-fetch'
+import { createHash, webcrypto } from 'crypto'
 import * as cheerio from 'cheerio'
 import type { CheerioAPI } from 'cheerio'
 import { cookieStore, type StoredCookie } from './cookies.js'
 import { stateManager } from './state.js'
+
+;(globalThis as any).SubtleCrypto = function SubtleCrypto() { return webcrypto.subtle }
 
 const DEFAULT_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -328,6 +331,15 @@ export const ApplicationImpl = {
   unregisterSearchFilter(_id: string) {},
   registeredSearchFilters(): unknown[] { return [] },
   invalidateSearchFilters() {},
+
+  // Crypto utilities
+  crypto_md5Hash(data: ArrayBuffer | Uint8Array): string {
+    const buf = data instanceof Uint8Array ? Buffer.from(data) : Buffer.from(data as ArrayBuffer)
+    return createHash('md5').update(buf).digest('hex')
+  },
+
+  // Form change notification stub
+  formDidChange(_formId: string, _values: unknown) {},
 
   // executeInWebView stub — Cloudflare bypass must be done manually
   async executeInWebView(_context: unknown): Promise<unknown> {

@@ -1,6 +1,4 @@
 import express from 'express'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import { providersRouter } from './routes/providers.js'
 import { searchRouter } from './routes/search.js'
 import { mangaRouter } from './routes/manga.js'
@@ -11,21 +9,20 @@ import { cloudflareRouter } from './routes/cloudflare.js'
 import { extensionsRouter } from './routes/extensions.js'
 import { scrapeRouter } from './routes/scrape.js'
 import { sourcesRouter } from './routes/sources.js'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const PUBLIC_DIR = path.resolve(__dirname, '../../public')
+import { webRouter } from './routes/web.js'
+import { mcpRouter } from './routes/mcp.js'
 
 export function createApp() {
   const app = express()
   app.use(express.json())
 
-  // Serve dashboard static files
-  app.use(express.static(PUBLIC_DIR))
+  app.use(webRouter)
 
-  // Health check
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() })
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), SubtleCryptoType: typeof (globalThis as any).SubtleCrypto })
   })
+
+  app.use(mcpRouter)
 
   app.use('/api/extensions', extensionsRouter)
   app.use('/api/scrape', scrapeRouter)

@@ -10,11 +10,20 @@
 
 import { ApplicationImpl } from './Application.js'
 
-// Inject the Application namespace into the global scope
 ;(globalThis as any).Application = ApplicationImpl
 
-// Ensure fetch is available globally (node 18+ has it natively; fallback for older)
 if (typeof globalThis.fetch === 'undefined') {
   const { default: nodeFetch } = await import('node-fetch')
   ;(globalThis as any).fetch = nodeFetch
+}
+
+{
+  const { webcrypto } = await import('crypto')
+  ;(globalThis as any).SubtleCrypto = function SubtleCrypto() { return webcrypto.subtle }
+  console.log('[globals] SubtleCrypto shim installed, type:', typeof (globalThis as any).SubtleCrypto)
+  try {
+    if (typeof (globalThis as any).crypto === 'undefined') {
+      Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true })
+    }
+  } catch { /* already defined */ }
 }
