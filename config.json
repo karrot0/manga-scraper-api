@@ -1,0 +1,24 @@
+{
+  "disabledExtensions": [
+    "Mangabuddy",
+    "Batcave",
+    "ReadAllComics",
+    "ReadComicsOnline"
+  ],
+  "extensionSources": [
+    {
+      "repoId": "kakarot",
+      "repoOwner": "karrot0",
+      "repoName": "KakarotExtension",
+      "branch": "gh-pages",
+      "pathPrefix": "0.9/stable"
+    },
+    {
+      "repoId": "inkdex",
+      "repoOwner": "inkdex",
+      "repoName": "general-extensions",
+      "branch": "gh-pages",
+      "pathPrefix": "0.9/stable"
+    }
+  ]
+}

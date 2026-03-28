@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MangaIce Scraper</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ice: { 400: '#67e8f9', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .card-hover { transition: transform .15s, box-shadow .15s; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(6,182,212,.2); }
+    .log-info   { color: #94a3b8; }
+    .log-success{ color: #4ade80; }
+    .log-warn   { color: #fbbf24; }
+    .log-error  { color: #f87171; }
+    .shimmer { background: linear-gradient(90deg, #1e293b 25%, #273348 50%, #1e293b 75%);
+               background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .badge-cf { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
+    .badge-ok { background: #10b98122; color: #34d399; border: 1px solid #10b98144; }
+    .progress-bar { transition: width .3s ease; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+<!-- HEADER -->
+<header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+  <div class="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-ice-400 to-ice-600 flex items-center justify-center text-slate-900 font-black text-sm">M</div>
+      <span class="font-bold text-lg tracking-tight">MangaIce <span class="text-ice-400">Scraper</span></span>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span id="provider-count" class="text-slate-500">Loading…</span>
+      <button id="btn-update" onclick="updateExtensions()" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Update Extensions
+      </button>
+      <a href="#database" onclick="showTab('database')" class="px-3 py-1.5 rounded-md bg-ice-600 hover:bg-ice-500 text-white text-xs transition">
+        📦 Database
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-screen-2xl mx-auto px-6 py-6">
+
+  <!-- TABS -->
+  <div class="flex gap-1 mb-6 border-b border-slate-800">
+    <button onclick="showTab('scraper')" id="tab-scraper" class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-ice-500 text-ice-400 -mb-px">🔍 Scraper</button>
+    <button onclick="showTab('database')" id="tab-database" class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px">📦 Database</button>
+    <button onclick="showTab('cloudflare')" id="tab-cloudflare" class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px">🛡️ Cloudflare</button>
+  </div>
+
+  <!-- ===== TAB: SCRAPER ===== -->
+  <div id="panel-scraper">
+    <div class="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
+
+      <!-- LEFT: Providers -->
+      <aside>
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Providers</h2>
+        <div class="relative mb-3">
+          <input id="provider-search" oninput="filterProviders(this.value)" placeholder="Filter providers…"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:border-ice-500" />
+        </div>
+        <div id="provider-list" class="space-y-1.5 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+          <div class="shimmer rounded-lg h-12 mb-1"></div>
+          <div class="shimmer rounded-lg h-12 mb-1"></div>
+          <div class="shimmer rounded-lg h-12"></div>
+        </div>
+      </aside>
+
+      <!-- RIGHT: Search + Results + Log -->
+      <main class="space-y-5">
+
+        <!-- Search bar -->
+        <div id="search-panel" class="hidden">
+          <div class="flex gap-2">
+            <input id="search-input" placeholder="Browse or search manga title…" onkeydown="if(event.key==='Enter')doSearch()"
+              class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:border-ice-500" />
+            <button onclick="doSearch()" class="px-5 py-2.5 bg-ice-600 hover:bg-ice-500 rounded-lg text-sm font-medium transition">
+              Search
+            </button>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span id="selected-provider-label">No provider selected</span>
+            <div class="ml-auto flex items-center gap-2 flex-wrap">
+              <span id="queue-badge" class="hidden px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium">⏳ <span id="queue-count">0</span> queued</span>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" id="opt-pages" checked class="rounded accent-cyan-500" />
+                Scrape pages
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                Max chapters:
+                <input type="number" id="opt-maxchap" placeholder="all" min="1"
+                  class="w-16 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-ice-500" />
+              </label>
+              <button id="btn-scrape-all" onclick="startScrapeAll()"
+                class="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-600/40 text-green-300 rounded-lg text-xs font-medium transition">
+                ⚡ Scrape All
+              </button>
+              <button id="btn-stop-all" onclick="stopScrapeAll()"
+                class="hidden px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 border border-red-600/40 text-red-300 rounded-lg text-xs font-medium transition">
+                ⏹ Stop
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results grid -->
+        <div id="results-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"></div>
+
+        <!-- Search pagination -->
+        <div id="search-pagination" class="hidden flex items-center justify-center gap-3">
+          <button id="search-prev" onclick="searchChangePage(-1)"
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition disabled:opacity-40">← Prev</button>
+          <span id="search-page-label" class="text-sm text-slate-400">Page 1</span>
+          <button id="search-next" onclick="searchChangePage(1)"
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition disabled:opacity-40">Next →</button>
+        </div>
+
+        <!-- Progress / Log -->
+        <div id="log-panel" class="hidden">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Progress</h3>
+            <button onclick="clearLog()" class="text-xs text-slate-600 hover:text-slate-400">Clear</button>
+          </div>
+          <div id="progress-wrap" class="hidden mb-3">
+            <div class="flex justify-between text-xs text-slate-500 mb-1">
+              <span id="progress-label">Chapters</span>
+              <span id="progress-pct">0%</span>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-2">
+              <div id="progress-bar" class="progress-bar bg-ice-500 h-2 rounded-full" style="width:0%"></div>
+            </div>
+          </div>
+          <div id="log-output"
+            class="bg-slate-900 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-0.5 max-h-56 overflow-y-auto">
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ===== TAB: DATABASE ===== -->
+  <div id="panel-database" class="hidden">
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <div class="relative flex-1 min-w-[200px]">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M16.65 16.65A7.5 7.5 0 1116.65 2a7.5 7.5 0 010 14.65z"/></svg>
+        <input id="db-search" oninput="dbSearchChanged()" placeholder="Search database…"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:border-ice-500" />
+      </div>
+      <span id="db-count" class="text-xs text-slate-500 whitespace-nowrap">—</span>
+      <button onclick="loadDatabase()" class="text-xs px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition">↻ Refresh</button>
+      <button onclick="rescrapeAll()" class="text-xs px-3 py-2 bg-slate-800 hover:bg-ice-900 border border-slate-700 hover:border-ice-600 text-slate-300 hover:text-ice-300 rounded-lg transition">↻ Rescrape All</button>
+    </div>
+    <div id="db-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+      <p class="text-slate-500 text-sm col-span-full">Click "Database" tab to load.</p>
+    </div>
+    <div id="db-pagination" class="hidden flex items-center justify-center gap-3 mt-6">
+      <button id="db-prev" onclick="dbChangePage(-1)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition disabled:opacity-40">← Prev</button>
+      <span id="db-page-label" class="text-sm text-slate-400">Page 1</span>
+      <button id="db-next" onclick="dbChangePage(1)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition disabled:opacity-40">Next →</button>
+    </div>
+  </div>
+
+  <!-- ===== TAB: CLOUDFLARE ===== -->
+  <div id="panel-cloudflare" class="hidden">
+    <h2 class="text-sm font-semibold text-slate-300 mb-4">Cloudflare Bypass</h2>
+    <div id="cf-provider-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+  </div>
+
+</div><!-- /max-w -->
+
+<!-- SCRAPE MODAL -->
+<div id="scrape-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md">
+    <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="font-semibold" id="modal-title">Add to Database</h3>
+      <button onclick="closeModal()" class="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
+    </div>
+    <div class="p-5 space-y-3">
+      <div class="flex gap-3">
+        <img id="modal-cover" src="" alt="" class="w-20 h-28 object-cover rounded-lg bg-slate-800 flex-shrink-0" />
+        <div class="min-w-0">
+          <p id="modal-manga-title" class="font-medium text-sm leading-snug mb-1"></p>
+          <p class="text-xs text-slate-500" id="modal-manga-id"></p>
+          <p class="text-xs text-slate-500 mt-1" id="modal-provider-name"></p>
+        </div>
+      </div>
+      <div class="flex gap-2 pt-1">
+        <button id="modal-btn-add" onclick="confirmScrape()" class="flex-1 py-2.5 bg-ice-600 hover:bg-ice-500 rounded-lg text-sm font-medium transition">
+          🚀 Scrape &amp; Add
+        </button>
+        <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+let allProviders = []
+let selectedProvider = null
+let currentPage = 1
+let hasMore = false
+let currentQuery = ''
+let pendingScrape = null
+
+// Scrape queue
+const scrapeQueue = []
+const cardStatus = new Map()   // mangaId -> 'pending'|'scraping'|'done'|'error'
+let queueWorkerActive = false
+let bulkActive = false
+let bulkStop = false
+
+// ── SessionStorage persistence (per provider, terminal states only) ─────────
+const CARD_STATUS_PREFIX = 'mangaice_cstat_'
+function saveCardStatus() {
+  if (!selectedProvider) return
+  try {
+    const o = {}
+    for (const [k, v] of cardStatus) { if (v === 'done' || v === 'error') o[k] = v }
+    sessionStorage.setItem(CARD_STATUS_PREFIX + selectedProvider, JSON.stringify(o))
+  } catch {}
+}
+function loadCardStatus() {
+  if (!selectedProvider) return
+  try {
+    const r = sessionStorage.getItem(CARD_STATUS_PREFIX + selectedProvider)
+    if (r) { const o = JSON.parse(r); for (const [k, v] of Object.entries(o)) cardStatus.set(k, v) }
+  } catch {}
+}
+
+// ============================================================
+// Init
+// ============================================================
+async function init() {
+  await loadProviders()
+  showTab('scraper')
+}
+
+// ============================================================
+// Tabs
+// ============================================================
+function showTab(name) {
+  for (const p of ['scraper','database','cloudflare']) {
+    document.getElementById(`panel-${p}`).classList.toggle('hidden', p !== name)
+    const btn = document.getElementById(`tab-${p}`)
+    if (btn) {
+      btn.classList.toggle('border-ice-500', p === name)
+      btn.classList.toggle('text-ice-400', p === name)
+      btn.classList.toggle('border-transparent', p !== name)
+      btn.classList.toggle('text-slate-400', p !== name)
+    }
+  }
+  if (name === 'database') loadDatabase()
+  if (name === 'cloudflare') renderCFProviders()
+}
+
+// ============================================================
+// Providers
+// ============================================================
+async function loadProviders() {
+  try {
+    const res = await fetch('/api/providers')
+    allProviders = await res.json()
+    document.getElementById('provider-count').textContent = `${allProviders.length} providers`
+    renderProviders(allProviders)
+    renderCFProviders()
+  } catch (e) {
+    document.getElementById('provider-count').textContent = 'Error loading'
+  }
+}
+
+function renderProviders(list) {
+  const el = document.getElementById('provider-list')
+  if (!list.length) { el.innerHTML = '<p class="text-slate-500 text-xs text-center py-4">No providers</p>'; return }
+  el.innerHTML = list.map(p => `
+    <button onclick="selectProvider('${p.id}')" id="prov-btn-${p.id}"
+      class="w-full text-left px-3 py-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-ice-700 hover:bg-slate-800 transition flex items-center gap-2.5 group">
+      <div class="w-8 h-8 rounded-md bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
+        ${p.name.slice(0,2).toUpperCase()}
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium text-slate-200 truncate">${p.name}</p>
+        <p class="text-xs text-slate-500">${p.repoId} · v${p.version}</p>
+      </div>
+      ${p.cloudflareEnabled ? '<span class="badge-cf text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0">CF</span>' : ''}
+    </button>
+  `).join('')
+}
+
+function filterProviders(q) {
+  const filtered = q
+    ? allProviders.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || p.repoId.toLowerCase().includes(q.toLowerCase()))
+    : allProviders
+  renderProviders(filtered)
+  if (selectedProvider) {
+    document.getElementById(`prov-btn-${selectedProvider}`)?.classList.add('border-ice-500','bg-slate-800')
+  }
+}
+
+function selectProvider(id) {
+  selectedProvider = id
+  document.querySelectorAll('[id^="prov-btn-"]').forEach(el => el.classList.remove('border-ice-500','bg-slate-800'))
+  document.getElementById(`prov-btn-${id}`)?.classList.add('border-ice-500','bg-slate-800')
+
+  const p = allProviders.find(x => x.id === id)
+  document.getElementById('selected-provider-label').innerHTML =
+    `<span class="text-slate-300 font-medium">${p?.name}</span> selected`
+  document.getElementById('search-panel').classList.remove('hidden')
+
+  document.getElementById('search-pagination').classList.add('hidden')
+  cardStatus.clear()
+  loadCardStatus()   // restore terminal states for this provider
+  currentPage = 1
+  currentQuery = ''
+
+  // Auto-browse: load first page immediately
+  setSearchLoading()
+  fetchResults('', 1)
+}
+
+// ============================================================
+// Search
+// ============================================================
+function setSearchLoading() {
+  document.getElementById('results-grid').innerHTML = Array(10).fill(
+    '<div class="shimmer rounded-xl aspect-[3/4]"></div>'
+  ).join('')
+  document.getElementById('search-pagination').classList.add('hidden')
+}
+
+async function doSearch() {
+  if (!selectedProvider) return
+  const q = document.getElementById('search-input').value.trim()
+  currentQuery = q
+  currentPage = 1
+  setSearchLoading()
+  await fetchResults(q, 1)
+}
+
+async function fetchResults(query, page) {
+  try {
+    const res = await fetch('/api/scrape/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerId: selectedProvider, query, page })
+    })
+    const data = await res.json()
+
+    // CF bypass required — auto-trigger browser bypass
+    if (data.cloudflare || (data.error && data.error.toLowerCase().includes('cloudflare'))) {
+      document.getElementById('results-grid').innerHTML =
+        `<p class="text-amber-400 text-sm col-span-full text-center py-8">🛡️ Cloudflare bypass required — opening browser…</p>`
+      await triggerCFBypassAndRetry(selectedProvider, query, page)
+      return
+    }
+
+    if (data.error) {
+      document.getElementById('results-grid').innerHTML =
+        `<p class="text-red-400 text-sm col-span-full text-center py-8">⚠️ ${escHtml(data.error)}</p>`
+      document.getElementById('search-pagination').classList.add('hidden')
+      return
+    }
+
+    const items = data.items ?? []
+    hasMore = !!(data.hasMore ?? (items.length >= 20))
+    currentPage = page
+
+    document.getElementById('results-grid').innerHTML = ''
+    if (!items.length) {
+      document.getElementById('results-grid').innerHTML =
+        `<p class="text-slate-500 text-sm col-span-full text-center py-8">No results found.</p>`
+      document.getElementById('search-pagination').classList.add('hidden')
+      return
+    }
+
+    appendResultCards(items)
+    updateSearchPagination()
+    checkExistingInDB(items)
+  } catch (e) {
+    document.getElementById('results-grid').innerHTML =
+      `<p class="text-red-400 text-sm col-span-full text-center py-8">Error: ${escHtml(e.message)}</p>`
+  }
+}
+
+function updateSearchPagination() {
+  const pag = document.getElementById('search-pagination')
+  pag.classList.toggle('hidden', currentPage === 1 && !hasMore)
+  document.getElementById('search-page-label').textContent = `Page ${currentPage}`
+  document.getElementById('search-prev').disabled = currentPage <= 1
+  document.getElementById('search-next').disabled = !hasMore
+}
+
+// ============================================================
+// DB cross-reference helpers
+// ============================================================
+function slugifyTitle(s) {
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+async function checkExistingInDB(items) {
+  if (!items.length) return
+  try {
+    const slugs = items.map(item => slugifyTitle(item.title))
+    const r = await fetch('/api/scrape/batch-exists', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs })
+    })
+    const { found } = await r.json()
+    const foundSet = new Set(found)
+    items.forEach((item, i) => {
+      if (foundSet.has(slugs[i]) && !cardStatus.has(item.mangaId)) {
+        cardStatus.set(item.mangaId, 'done')
+        saveCardStatus()
+        updateCardOverlay(item.mangaId)
+      }
+    })
+  } catch {}
+}
+
+function searchChangePage(delta) {
+  const newPage = currentPage + delta
+  if (newPage < 1) return
+  if (delta > 0 && !hasMore) return
+  setSearchLoading()
+  fetchResults(currentQuery, newPage)
+}
+
+// ============================================================
+// CF Auto-Bypass
+// ============================================================
+async function triggerCFBypassAndRetry(providerId, query, page) {
+  document.getElementById('results-grid').innerHTML =
+    `<p class="text-amber-400 text-sm col-span-full text-center py-8">🛡️ Cloudflare bypass required — opening browser, complete the challenge then close or click Done…</p>`
+  try {
+    const data = await openBrowserBypass(providerId)
+    if (data && data.success) {
+      setSearchLoading()
+      await fetchResults(query, page)
+    } else {
+      document.getElementById('results-grid').innerHTML =
+        `<p class="text-red-400 text-sm col-span-full text-center py-8">❌ CF bypass failed: ${escHtml(data?.error ?? 'unknown')}</p>`
+    }
+  } catch (e) {
+    document.getElementById('results-grid').innerHTML =
+      `<p class="text-red-400 text-sm col-span-full text-center py-8">❌ CF bypass error: ${escHtml(e.message)}</p>`
+  }
+}
+
+// ============================================================
+// Result Cards
+// ============================================================
+function appendResultCards(items) {
+  const grid = document.getElementById('results-grid')
+  items.forEach(item => {
+    const card = document.createElement('div')
+    card.className = 'card-hover cursor-pointer group relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-ice-600'
+    card.setAttribute('data-manga-id', item.mangaId)
+    card.onclick = () => openScrapeModal(item)
+    card.innerHTML = `
+      <div class="aspect-[3/4] overflow-hidden bg-slate-800">
+        <img src="${item.imageUrl || ''}" alt="${escHtml(item.title)}"
+          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22160%22><rect fill=%22%23334155%22 width=%22120%22 height=%22160%22/><text fill=%22%23475569%22 x=%2260%22 y=%2285%22 text-anchor=%22middle%22 font-size=%2212%22>No Image</text></svg>'" />
+      </div>
+      <div class="p-2">
+        <p class="card-title text-xs font-medium text-slate-200 line-clamp-2 leading-snug">${escHtml(item.title)}</p>
+      </div>
+      <div class="absolute inset-0 bg-ice-600/0 group-hover:bg-ice-600/10 transition-colors flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 pointer-events-none">
+        <span class="bg-ice-600 text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">+ Add to DB</span>
+      </div>
+      <div class="card-status-overlay absolute inset-0 pointer-events-none hidden"></div>
+    `
+    if (cardStatus.has(item.mangaId)) updateCardOverlay(item.mangaId)
+    grid.appendChild(card)
+  })
+}
+
+function getCardEl(mangaId) {
+  try { return document.querySelector(`[data-manga-id="${CSS.escape(mangaId)}"]`) }
+  catch { return null }
+}
+
+function updateCardOverlay(mangaId) {
+  const card = getCardEl(mangaId)
+  if (!card) return
+  const overlay = card.querySelector('.card-status-overlay')
+  const state = cardStatus.get(mangaId)
+  if (!overlay || !state) return
+
+  const configs = {
+    pending:  { bg: 'bg-black/50', html: `<div class="absolute bottom-2 inset-x-2 text-center"><span class="inline-block bg-amber-500/90 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">⏳ Queued</span></div>` },
+    scraping: { bg: 'bg-black/60', html: `<div class="absolute inset-0 flex items-center justify-center"><div class="w-9 h-9 border-[3px] border-ice-400 border-t-transparent rounded-full animate-spin"></div></div><div class="absolute bottom-2 inset-x-2 text-center"><span class="inline-block bg-ice-600/90 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">↻ Scraping…</span></div>` },
+    done:     { bg: 'bg-black/40', html: `<div class="absolute inset-0 flex items-center justify-center"><div class="w-11 h-11 rounded-full bg-green-500/90 flex items-center justify-center text-white text-xl font-bold">✓</div></div>` },
+    error:    { bg: 'bg-black/60', html: `<div class="absolute inset-0 flex items-center justify-center"><div class="w-11 h-11 rounded-full bg-red-500/90 flex items-center justify-center text-white text-xl font-bold">✗</div></div><div class="absolute bottom-2 inset-x-2 text-center"><span class="inline-block bg-red-600/90 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">Error</span></div>` },
+  }
+  const c = configs[state]
+  if (c) {
+    overlay.className = `card-status-overlay absolute inset-0 pointer-events-none ${c.bg}`
+    overlay.innerHTML = c.html
+  }
+}
+
+function updateQueueBadge() {
+  const badge = document.getElementById('queue-badge')
+  const count = scrapeQueue.length + (queueWorkerActive ? 1 : 0)
+  if (count > 0) {
+    badge.classList.remove('hidden')
+    document.getElementById('queue-count').textContent = count
+  } else {
+    badge.classList.add('hidden')
+  }
+}
+
+// ============================================================
+// Scrape Modal (single item)
+// ============================================================
+function openScrapeModal(item) {
+  const state = cardStatus.get(item.mangaId)
+  if (state === 'done' || state === 'scraping' || state === 'pending') return
+
+  pendingScrape = { ...item, providerId: selectedProvider }
+  document.getElementById('modal-title').textContent = 'Add to Database'
+  document.getElementById('modal-manga-title').textContent = item.title
+  document.getElementById('modal-manga-id').textContent = `ID: ${item.mangaId}`
+  const p = allProviders.find(x => x.id === selectedProvider)
+  document.getElementById('modal-provider-name').textContent = `Provider: ${p?.name ?? selectedProvider}`
+  document.getElementById('modal-cover').src = item.imageUrl || ''
+  document.getElementById('modal-btn-add').disabled = false
+  document.getElementById('modal-btn-add').textContent = '🚀 Scrape & Add'
+  document.getElementById('scrape-modal').classList.remove('hidden')
+}
+
+function closeModal() {
+  document.getElementById('scrape-modal').classList.add('hidden')
+  pendingScrape = null
+}
+
+async function confirmScrape() {
+  if (!pendingScrape) return
+  const item = pendingScrape          // capture before closeModal clears it
+  document.getElementById('modal-btn-add').disabled = true
+  document.getElementById('modal-btn-add').textContent = '⏳ Queued…'
+  closeModal()
+  enqueue(item)
+}
+
+// ============================================================
+// Scrape Queue
+// ============================================================
+function enqueue(item) {
+  const state = cardStatus.get(item.mangaId)
+  if (state === 'done' || state === 'scraping' || state === 'pending') return
+  cardStatus.set(item.mangaId, 'pending')
+  updateCardOverlay(item.mangaId)
+  scrapeQueue.push(item)
+  updateQueueBadge()
+  if (!queueWorkerActive) processQueue()
+}
+
+async function processQueue() {
+  queueWorkerActive = true
+
+  while (scrapeQueue.length > 0) {
+    const item = scrapeQueue.shift()
+    updateQueueBadge()
+    cardStatus.set(item.mangaId, 'scraping')
+    updateCardOverlay(item.mangaId)
+
+    try {
+      await runScrapeItem(item)
+      cardStatus.set(item.mangaId, 'done')
+    } catch (e) {
+      cardStatus.set(item.mangaId, 'error')
+      addLog(`❌ "${item.title}": ${e.message}`, 'error')
+    }
+    updateCardOverlay(item.mangaId)
+    updateQueueBadge()
+
+    // Bulk mode: when queue drains, auto-advance to next page
+    if (bulkActive && !bulkStop && scrapeQueue.length === 0 && hasMore) {
+      await loadNextBulkPage()
+    }
+  }
+
+  queueWorkerActive = false
+  updateQueueBadge()
+
+  if (bulkActive) {
+    bulkActive = false
+    bulkStop = false
+    document.getElementById('btn-scrape-all').classList.remove('hidden')
+    document.getElementById('btn-stop-all').classList.add('hidden')
+    addLog('✅ Scrape All complete!', 'success')
+  }
+}
+
+function runScrapeItem(item) {
+  document.getElementById('log-panel').classList.remove('hidden')
+  addLog(`🚀 "${item.title}" (${item.providerId})`, 'info')
+
+  const scrapePages = document.getElementById('opt-pages').checked
+  const maxChap = parseInt(document.getElementById('opt-maxchap').value) || null
+  const body = { providerId: item.providerId, mangaId: item.mangaId, scrapePages, maxChapters: maxChap }
+
+  return new Promise((resolve, reject) => {
+    fetch('/api/scrape/series', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(res => {
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+
+      function pump() {
+        reader.read().then(({ done, value }) => {
+          if (done) { resolve(); return }
+          buf += decoder.decode(value, { stream: true })
+          const parts = buf.split('\n\n')
+          buf = parts.pop() ?? ''
+          for (const chunk of parts) {
+            const lines = chunk.split('\n')
+            let evt = '', data = ''
+            for (const line of lines) {
+              if (line.startsWith('event: ')) evt = line.slice(7)
+              if (line.startsWith('data: ')) data = line.slice(6)
+            }
+            if (!evt || !data) continue
+            try {
+              const parsed = JSON.parse(data)
+              if (evt === 'done') resolve()
+              else if (evt === 'error') reject(new Error(parsed.message))
+              else handleSSEEvent(evt, parsed)
+            } catch {}
+          }
+          pump()
+        }).catch(reject)
+      }
+      pump()
+    }).catch(reject)
+  })
+}
+
+// ============================================================
+// Scrape All
+// ============================================================
+function startScrapeAll() {
+  if (!selectedProvider) return
+  const cards = [...document.querySelectorAll('#results-grid [data-manga-id]')]
+  if (!cards.length) return
+
+  bulkActive = true
+  bulkStop = false
+  document.getElementById('btn-scrape-all').classList.add('hidden')
+  document.getElementById('btn-stop-all').classList.remove('hidden')
+
+  let queued = 0
+  cards.forEach(card => {
+    const mangaId = card.getAttribute('data-manga-id')
+    const title = card.querySelector('.card-title')?.textContent?.trim() ?? mangaId
+    const imageUrl = card.querySelector('img')?.src ?? ''
+    const state = cardStatus.get(mangaId)
+    if (state !== 'done' && state !== 'scraping' && state !== 'pending') {
+      enqueue({ mangaId, title, imageUrl, providerId: selectedProvider })
+      queued++
+    }
+  })
+
+  addLog(`⚡ Scrape All: queued ${queued} items (page ${currentPage})`, 'info')
+  document.getElementById('log-panel').classList.remove('hidden')
+}
+
+function stopScrapeAll() {
+  bulkStop = true
+  bulkActive = false
+  document.getElementById('btn-scrape-all').classList.remove('hidden')
+  document.getElementById('btn-stop-all').classList.add('hidden')
+  addLog('⏹ Scrape All stopped by user.', 'warn')
+}
+
+async function loadNextBulkPage() {
+  if (bulkStop || !hasMore) return
+  const nextPage = currentPage + 1
+  addLog(`📄 Bulk: loading page ${nextPage}…`, 'info')
+  setSearchLoading()
+  await fetchResults(currentQuery, nextPage)
+  if (!bulkStop) {
+    const cards = [...document.querySelectorAll('#results-grid [data-manga-id]')]
+    let queued = 0
+    cards.forEach(card => {
+      const mangaId = card.getAttribute('data-manga-id')
+      const title = card.querySelector('.card-title')?.textContent?.trim() ?? mangaId
+      const imageUrl = card.querySelector('img')?.src ?? ''
+      const state = cardStatus.get(mangaId)
+      if (state !== 'done' && state !== 'scraping' && state !== 'pending') {
+        enqueue({ mangaId, title, imageUrl, providerId: selectedProvider })
+        queued++
+      }
+    })
+    addLog(`⚡ Bulk: queued ${queued} items (page ${nextPage})`, 'info')
+  }
+}
+
+// ============================================================
+// SSE event handler
+// ============================================================
+function handleSSEEvent(event, data) {
+  const progWrap = document.getElementById('progress-wrap')
+  const progBar = document.getElementById('progress-bar')
+  const progPct = document.getElementById('progress-pct')
+  const progLabel = document.getElementById('progress-label')
+
+  if (event === 'log') {
+    addLog(data.msg, data.type)
+  } else if (event === 'chapters_count') {
+    progWrap.classList.remove('hidden')
+    progLabel.textContent = `Chapters (0 / ${data.count})`
+    progBar.style.width = '0%'
+    progPct.textContent = '0%'
+  } else if (event === 'progress') {
+    const pct = Math.round(data.current / data.total * 100)
+    progBar.style.width = `${pct}%`
+    progPct.textContent = `${pct}%`
+    progLabel.textContent = `Chapters (${data.current} / ${data.total})`
+  } else if (event === 'done') {
+    progBar.style.width = '100%'
+    progPct.textContent = '100%'
+    addLog(`✅ Done! ${data.chaptersCount} chapters, ${data.pagesTotal} pages`, 'success')
+    addLog(`🔗 Slug: ${data.slug} | ID: ${data.seriesId}`, 'success')
+  } else if (event === 'error') {
+    addLog(`❌ ${data.message}`, 'error')
+  }
+}
+
+// ============================================================
+// Log
+// ============================================================
+function addLog(msg, type = 'info') {
+  const el = document.getElementById('log-output')
+  const line = document.createElement('div')
+  line.className = `log-${type}`
+  line.textContent = msg
+  el.appendChild(line)
+  el.scrollTop = el.scrollHeight
+}
+
+function clearLog() {
+  document.getElementById('log-output').innerHTML = ''
+  document.getElementById('progress-wrap').classList.add('hidden')
+}
+
+// ============================================================
+// Database tab
+// ============================================================
+let dbPage = 1
+const DB_LIMIT = 24
+let dbSearchTimer = null
+
+function dbSearchChanged() {
+  clearTimeout(dbSearchTimer)
+  dbSearchTimer = setTimeout(() => { dbPage = 1; loadDatabase() }, 350)
+}
+
+function dbChangePage(delta) {
+  dbPage = Math.max(1, dbPage + delta)
+  loadDatabase()
+}
+
+async function loadDatabase() {
+  const grid = document.getElementById('db-grid')
+  const pag = document.getElementById('db-pagination')
+  grid.innerHTML = Array(6).fill('<div class="shimmer rounded-xl aspect-[3/4]"></div>').join('')
+  pag.classList.add('hidden')
+
+  const search = document.getElementById('db-search').value.trim()
+  const params = new URLSearchParams({ page: dbPage, limit: DB_LIMIT })
+  if (search) params.set('search', search)
+
+  try {
+    const res = await fetch(`/api/scrape/series?${params}`)
+    const data = await res.json()
+    const series = data.items ?? []
+    const total = data.total ?? 0
+    const totalPages = Math.max(1, Math.ceil(total / DB_LIMIT))
+
+    document.getElementById('db-count').textContent = `${total} series`
+
+    if (!series.length) {
+      grid.innerHTML = `<p class="text-slate-500 text-sm col-span-full text-center py-12">${search ? 'No results for "' + escHtml(search) + '"' : 'No series in database yet.'}</p>`
+      return
+    }
+
+    grid.innerHTML = series.map(s => `
+      <div class="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 card-hover flex flex-col">
+        <div class="aspect-[3/4] bg-slate-800 overflow-hidden relative">
+          <img src="${s.cover_url || ''}" alt="${escHtml(s.title)}"
+            class="w-full h-full object-cover"
+            onerror="this.style.display='none'" />
+          <span class="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-slate-900/80 text-slate-300 border border-slate-700">${escHtml(s.status ?? '')}</span>
+        </div>
+        <div class="p-2 flex-1 flex flex-col gap-1.5">
+          <p class="text-xs font-medium text-slate-200 line-clamp-2 leading-snug flex-1">${escHtml(s.title)}</p>
+          <p class="text-[10px] text-slate-500 truncate">${escHtml(s.slug)}</p>
+          <div class="flex gap-1 mt-0.5">
+            <button onclick="dbCopyLink('${escHtml(s.slug)}')" title="Copy link"
+              class="flex-1 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] text-slate-300 transition">🔗</button>
+            <button onclick="dbFindSources('${escHtml(s.id)}','${escHtml(s.title)}')" title="Find &amp; link other providers"
+              class="flex-1 py-1 bg-slate-800 hover:bg-cyan-900 rounded text-[10px] text-cyan-400 transition">🔍</button>
+            <button onclick="dbUpdate('${escHtml(s.id)}','${escHtml(s.slug)}','${escHtml(s.title)}')" title="Re-scrape"
+              class="flex-1 py-1 bg-slate-800 hover:bg-ice-700 rounded text-[10px] text-slate-300 transition">♻</button>
+            <button onclick="dbDelete('${escHtml(s.id)}','${escHtml(s.title)}')" title="Delete"
+              class="flex-1 py-1 bg-slate-800 hover:bg-red-900 rounded text-[10px] text-red-400 transition">🗑</button>
+          </div>
+        </div>
+      </div>
+    `).join('')
+
+    pag.classList.toggle('hidden', totalPages <= 1)
+    document.getElementById('db-page-label').textContent = `Page ${dbPage} / ${totalPages}`
+    document.getElementById('db-prev').disabled = dbPage <= 1
+    document.getElementById('db-next').disabled = dbPage >= totalPages
+  } catch (e) {
+    grid.innerHTML = `<p class="text-red-400 text-sm col-span-full">Error: ${e.message}</p>`
+  }
+}
+
+function dbCopyLink(slug) {
+  const url = `${location.origin}/manga/${slug}`
+  navigator.clipboard.writeText(url).then(() => {
+    const toast = document.createElement('div')
+    toast.className = 'fixed bottom-4 right-4 bg-slate-800 border border-slate-700 text-xs text-slate-200 px-4 py-2 rounded-lg shadow-xl z-50'
+    toast.textContent = `Copied: /manga/${slug}`
+    document.body.appendChild(toast)
+    setTimeout(() => toast.remove(), 2000)
+  })
+}
+
+async function dbDelete(id, title) {
+  if (!confirm(`Delete "${title}" from database? This will also remove all chapters.`)) return
+  try {
+    const res = await fetch(`/api/scrape/series/${id}`, { method: 'DELETE' })
+    const data = await res.json()
+    if (data.success) loadDatabase()
+    else alert('Delete failed: ' + data.error)
+  } catch (e) {
+    alert('Delete error: ' + e.message)
+  }
+}
+
+function dbUpdate(id, slug, title) {
+  showTab('scraper')
+  setTimeout(() => {
+    const si = document.getElementById('search-input')
+    if (si) { si.value = title; si.focus() }
+    addLog(`ℹ Re-scrape "${title}": select a provider and search, then click the card.`, 'info')
+    document.getElementById('log-panel').classList.remove('hidden')
+  }, 100)
+}
+
+function rescrapeAll() {
+  if (!confirm('Rescrape all series?\n\nThis will add new chapters only — existing chapter data is never overwritten.\nThis may take a long time for large libraries.')) return
+  showTab('scraper')
+  document.getElementById('log-panel').classList.remove('hidden')
+  addLog('🔄 Starting rescrape of all series…', 'info')
+
+  fetch('/api/scrape/rescrape-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scrapePages: true })
+  }).then(res => {
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    function pump() {
+      reader.read().then(({ done, value }) => {
+        if (done) return
+        buf += decoder.decode(value, { stream: true })
+        const parts = buf.split('\n\n')
+        buf = parts.pop() ?? ''
+        for (const chunk of parts) {
+          const lines = chunk.split('\n')
+          let evt = '', data = ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) evt = line.slice(7)
+            if (line.startsWith('data: ')) data = line.slice(6)
+          }
+          if (!evt || !data) continue
+          try {
+            const parsed = JSON.parse(data)
+            if (evt === 'log') addLog(parsed.msg, parsed.type ?? 'info')
+            else if (evt === 'progress') {
+              document.getElementById('progress-bar-fill').style.width = `${Math.round(parsed.current / parsed.total * 100)}%`
+              document.getElementById('progress-text').textContent = `${parsed.current} / ${parsed.total}`
+              document.getElementById('progress-bar').classList.remove('hidden')
+            }
+            else if (evt === 'done') {
+              addLog(`✅ Done: ${parsed.processed} series processed, ${parsed.newChapters} new chapters added`, 'success')
+              document.getElementById('progress-bar').classList.add('hidden')
+              loadDatabase()
+            }
+            else if (evt === 'error') addLog(`❌ ${parsed.message}`, 'error')
+          } catch {}
+        }
+        pump()
+      }).catch(e => addLog(`❌ Stream error: ${e.message}`, 'error'))
+    }
+    pump()
+  }).catch(e => addLog(`❌ Rescrape error: ${e.message}`, 'error'))
+}
+
+function dbFindSources(seriesId, title) {
+  showTab('scraper')
+  document.getElementById('log-panel').classList.remove('hidden')
+  document.getElementById('search-panel').classList.remove('hidden')
+  addLog(`🔍 Searching all providers for "${title}"…`, 'info')
+  fetch('/api/scrape/find-sources', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seriesId, linkChapters: true })
+  }).then(res => {
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    function pump() {
+      reader.read().then(({ done, value }) => {
+        if (done) return
+        buf += decoder.decode(value, { stream: true })
+        const parts = buf.split('\n\n')
+        buf = parts.pop() ?? ''
+        for (const chunk of parts) {
+          const lines = chunk.split('\n')
+          let evt = '', data = ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) evt = line.slice(7)
+            if (line.startsWith('data: ')) data = line.slice(6)
+          }
+          if (!evt || !data) continue
+          try {
+            const parsed = JSON.parse(data)
+            if (evt === 'log') addLog(parsed.msg, parsed.type ?? 'info')
+            else if (evt === 'done') addLog(`✅ ${parsed.linkedCount} provider(s) linked for "${title}"`, 'success')
+            else if (evt === 'error') addLog(`❌ ${parsed.message}`, 'error')
+          } catch {}
+        }
+        pump()
+      }).catch(e => addLog(`❌ Stream error: ${e.message}`, 'error'))
+    }
+    pump()
+  }).catch(e => addLog(`❌ Find sources error: ${e.message}`, 'error'))
+}
+
+// ============================================================
+// Cloudflare tab
+// ============================================================
+function renderCFProviders() {
+  const list = document.getElementById('cf-provider-list')
+  if (!list) return
+  const cfProviders = allProviders.filter(p => p.cloudflareEnabled)
+  if (!cfProviders.length) {
+    list.innerHTML = '<p class="text-slate-500 text-sm">No CF-protected providers loaded.</p>'
+    return
+  }
+  list.innerHTML = cfProviders.map(p => `
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <p class="font-medium text-sm">${p.name}</p>
+          <p class="text-xs text-slate-500">${p.repoId} · v${p.version}${p.baseUrl ? ' · ' + p.baseUrl : ''}</p>
+        </div>
+        <span class="badge-cf text-[10px] px-2 py-0.5 rounded font-medium">CF</span>
+      </div>
+      <button onclick="openBrowserBypass('${p.id}')" id="cf-btn-${p.id}"
+        class="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 rounded-lg text-xs font-medium transition">
+        🌐 Open Browser Bypass
+      </button>
+      <div id="cf-log-${p.id}" class="mt-2 text-xs text-slate-500 hidden"></div>
+    </div>
+  `).join('')
+}
+
+async function openBrowserBypass(providerId) {
+  // Button/log elements are optional — bypass works even when called from Scraper tab
+  const btn = document.getElementById(`cf-btn-${providerId}`)
+  const logEl = document.getElementById(`cf-log-${providerId}`)
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Opening browser…' }
+  if (logEl) { logEl.textContent = ''; logEl.classList.remove('hidden') }
+
+  try {
+    const res = await fetch(`/api/providers/${providerId}/cloudflare/bypass`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeout: 300 })
+    })
+    const data = await res.json()
+    if (data.success) {
+      if (logEl) { logEl.className = 'mt-2 text-xs text-green-400'; logEl.textContent = `✅ ${data.cookieCount} cookies saved` }
+    } else {
+      if (logEl) { logEl.className = 'mt-2 text-xs text-red-400'; logEl.textContent = `❌ ${data.error}` }
+    }
+    return data
+  } catch (e) {
+    if (logEl) { logEl.className = 'mt-2 text-xs text-red-400'; logEl.textContent = `❌ ${e.message}` }
+    throw e
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🌐 Open Browser Bypass' }
+  }
+}
+
+// ============================================================
+// Extensions update
+// ============================================================
+async function updateExtensions() {
+  const btn = document.getElementById('btn-update')
+  btn.textContent = '⏳ Updating…'
+  btn.disabled = true
+  try {
+    const res = await fetch('/api/extensions/update', { method: 'POST' })
+    const data = await res.json()
+    btn.textContent = `✓ ${data.loaded} loaded`
+    setTimeout(() => { btn.textContent = 'Update Extensions'; btn.disabled = false }, 3000)
+    await loadProviders()
+  } catch {
+    btn.textContent = 'Error'
+    btn.disabled = false
+  }
+}
+
+// ============================================================
+// Utils
+// ============================================================
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+document.getElementById('scrape-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal()
+})
+
+init()
+</script>
+</body>
+</html>
