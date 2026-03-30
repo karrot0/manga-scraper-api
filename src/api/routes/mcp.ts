@@ -48,7 +48,18 @@ function buildMcpServer() {
       if (!entry) return { isError: true, content: [{ type: 'text', text: `Provider "${providerId}" not found` }] }
 
       try {
-        const results = await entry.instance.getSearchResults({ title: query, filters: [], sorting: undefined }, page)
+        let sortingOption: any
+        if (typeof entry.instance.getSortingOptions === 'function') {
+          try {
+            const opts = await entry.instance.getSortingOptions()
+            if (Array.isArray(opts) && opts.length > 0) sortingOption = opts[0]
+          } catch { /* ignore */ }
+        }
+        const results = await entry.instance.getSearchResults(
+          { title: query, filters: [], includedTags: [], excludedTags: [] },
+          { page },
+          sortingOption,
+        )
         return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] }
       } catch (e: any) {
         return { isError: true, content: [{ type: 'text', text: e.message }] }
@@ -90,7 +101,7 @@ function buildMcpServer() {
       if (!entry) return { isError: true, content: [{ type: 'text', text: `Provider "${providerId}" not found` }] }
 
       try {
-        const chapters = await entry.instance.getChapters(mangaId)
+        const chapters = await entry.instance.getChapters({ mangaId })
         return { content: [{ type: 'text', text: JSON.stringify(chapters, null, 2) }] }
       } catch (e: any) {
         return { isError: true, content: [{ type: 'text', text: e.message }] }
