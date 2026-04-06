@@ -13,6 +13,11 @@ export const webRouter = express.Router()
 
 let cachedBundle: string | null = null
 
+webRouter.get('/api/config', (_req, res) => {
+  const supabaseConfigured = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
+  res.json({ supabaseConfigured })
+})
+
 webRouter.get('/bundle.js', async (_req, res) => {
   try {
     if (!cachedBundle) {

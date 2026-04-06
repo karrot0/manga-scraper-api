@@ -5,16 +5,17 @@
 
 import { createClient } from '@supabase/supabase-js'
 
+
 const url = process.env.SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_KEY
 
-if (!url || !key) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables')
-}
+export const supabase = (url && key)
+  ? createClient(url, key, { auth: { persistSession: false } })
+  : null
 
-export const supabase = createClient(url, key, {
-  auth: { persistSession: false },
-})
+function ensureSupabase() {
+  if (!supabase) throw new Error('Supabase is not configured')
+}
 
 // ---------------------------------------------------------------------------
 // Types mirroring the DB schema
@@ -81,12 +82,12 @@ export function slugify(str: string): string {
  * Upsert a series by slug and return the persisted row (with id).
  */
 export async function upsertSeries(data: DbSeries): Promise<{ id: string; slug: string }> {
-  const { data: row, error } = await supabase
+  ensureSupabase()
+  const { data: row, error } = await supabase!
     .from('series')
     .upsert(data, { onConflict: 'slug' })
     .select('id, slug')
     .single()
-
   if (error) throw new Error(`upsertSeries failed: ${error.message}`)
   return row as { id: string; slug: string }
 }
@@ -100,20 +101,18 @@ export async function upsertSeries(data: DbSeries): Promise<{ id: string; slug: 
  * We deduplicate before sending (last entry for a given key wins).
  */
 export async function upsertChapters(chapters: DbChapter[]): Promise<number> {
+  ensureSupabase()
   if (chapters.length === 0) return 0
-
   // Deduplicate by (series_id, chapter_number) — last occurrence wins
   const seen = new Map<string, DbChapter>()
   for (const ch of chapters) {
     seen.set(`${ch.series_id}:${ch.chapter_number}`, ch)
   }
   const deduped = [...seen.values()]
-
-  const { error, count } = await supabase
+  const { error, count } = await supabase!
     .from('chapters')
     .upsert(deduped, { onConflict: 'series_id,chapter_number' })
     .select('id')
-
   if (error) throw new Error(`upsertChapters failed: ${error.message}`)
   return count ?? deduped.length
 }
@@ -123,7 +122,8 @@ export async function upsertChapters(chapters: DbChapter[]): Promise<number> {
  * Conflict key: (series_id, provider_id).
  */
 export async function upsertSeriesSource(source: DbSeriesSource): Promise<void> {
-  const { error } = await supabase
+  ensureSupabase()
+  const { error } = await supabase!
     .from('series_sources')
     .upsert(source, { onConflict: 'series_id,provider_id' })
   if (error) throw new Error(`upsertSeriesSource failed: ${error.message}`)
@@ -134,7 +134,8 @@ export async function upsertSeriesSource(source: DbSeriesSource): Promise<void> 
  * Conflict key: (chapter_id, provider_id).
  */
 export async function upsertChapterSource(source: DbChapterSource): Promise<void> {
-  const { error } = await supabase
+  ensureSupabase()
+  const { error } = await supabase!
     .from('chapter_sources')
     .upsert(source, { onConflict: 'chapter_id,provider_id' })
   if (error) throw new Error(`upsertChapterSource failed: ${error.message}`)
@@ -145,11 +146,12 @@ export async function upsertChapterSource(source: DbChapterSource): Promise<void
  * Deduplicates by (chapter_id, provider_id) before sending.
  */
 export async function upsertChapterSources(sources: DbChapterSource[]): Promise<void> {
+  ensureSupabase()
   if (sources.length === 0) return
   const seen = new Map<string, DbChapterSource>()
   for (const s of sources) seen.set(`${s.chapter_id}:${s.provider_id}`, s)
   const deduped = [...seen.values()]
-  const { error } = await supabase
+  const { error } = await supabase!
     .from('chapter_sources')
     .upsert(deduped, { onConflict: 'chapter_id,provider_id' })
   if (error) throw new Error(`upsertChapterSources failed: ${error.message}`)
@@ -160,7 +162,8 @@ export async function upsertChapterSources(sources: DbChapterSource[]): Promise<
  * Used by find-sources to map provider chapters onto existing DB chapters.
  */
 export async function getChapterMap(seriesId: string): Promise<Map<number, string>> {
-  const { data, error } = await supabase
+  ensureSupabase()
+  const { data, error } = await supabase!
     .from('chapters')
     .select('id, chapter_number')
     .eq('series_id', seriesId)

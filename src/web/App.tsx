@@ -8,20 +8,32 @@ import ApiExplorerTab from './components/ApiExplorerTab'
 
 type Tab = 'scraper' | 'database' | 'cloudflare' | 'api'
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'scraper',    label: 'Scraper',    icon: <Search size={15} /> },
-  { id: 'database',  label: 'Database',   icon: <Database size={15} /> },
-  { id: 'cloudflare',label: 'Cloudflare', icon: <Shield size={15} /> },
-  { id: 'api',       label: 'API',        icon: <Code2 size={15} /> },
-]
-
 export default function App() {
   const [tab, setTab] = useState<Tab>('scraper')
   const [providers, setProviders] = useState<Provider[]>([])
   const [updateLabel, setUpdateLabel] = useState('Update')
   const [updating, setUpdating] = useState(false)
+  const [supabaseConfigured, setSupabaseConfigured] = useState(false)
 
-  useEffect(() => { loadProviders() }, [])
+  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'scraper',    label: 'Scraper',    icon: <Search size={15} /> },
+    ...(supabaseConfigured ? [{ id: 'database' as Tab, label: 'Database', icon: <Database size={15} /> }] : []),
+    { id: 'cloudflare',label: 'Cloudflare', icon: <Shield size={15} /> },
+    { id: 'api',       label: 'API',        icon: <Code2 size={15} /> },
+  ]
+
+  useEffect(() => { 
+    loadProviders()
+    loadConfig()
+  }, [])
+
+  async function loadConfig() {
+    try {
+      const res = await fetch('/api/config')
+      const data = await res.json()
+      setSupabaseConfigured(data.supabaseConfigured)
+    } catch {}
+  }
 
   async function loadProviders() {
     try {
@@ -94,7 +106,7 @@ export default function App() {
 
       {/* Content */}
       <main className="flex-1 max-w-screen-2xl w-full mx-auto px-5 py-5">
-        {tab === 'scraper'    && <ScraperTab providers={providers} />}
+        {tab === 'scraper'    && <ScraperTab providers={providers} supabaseConfigured={supabaseConfigured} />}
         {tab === 'database'  && <DatabaseTab />}
         {tab === 'cloudflare'&& <CloudflareTab providers={providers} />}
         {tab === 'api'       && <ApiExplorerTab providers={providers} />}

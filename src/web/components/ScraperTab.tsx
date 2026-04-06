@@ -8,6 +8,7 @@ import { Provider, MangaItem, CardStatus, LogEntry, LogType } from '../types'
 
 interface Props {
   providers: Provider[]
+  supabaseConfigured: boolean
 }
 
 const CARD_STATUS_PREFIX = 'mangaice_cstat_'
@@ -52,9 +53,9 @@ function CardOverlay({ status }: { status: CardStatus | undefined }) {
 
 // ── Manga Card ────────────────────────────────────────────────────────────────
 const MangaCard = React.memo(function MangaCard({
-  item, status, onClick,
-}: { item: MangaItem; status: CardStatus | undefined; onClick: () => void }) {
-  const clickable = !status || (status !== 'done' && status !== 'scraping' && status !== 'pending')
+  item, status, onClick, supabaseConfigured,
+}: { item: MangaItem; status: CardStatus | undefined; onClick: () => void; supabaseConfigured: boolean }) {
+  const clickable = supabaseConfigured && (!status || (status !== 'done' && status !== 'scraping' && status !== 'pending'))
   return (
     <div
       onClick={clickable ? onClick : undefined}
@@ -75,11 +76,11 @@ const MangaCard = React.memo(function MangaCard({
       <div className="p-2">
         <p className="text-xs font-medium text-zinc-200 line-clamp-2 leading-snug">{item.title}</p>
       </div>
-      {clickable && (
+      {supabaseConfigured || clickable ? (
         <div className="absolute inset-0 bg-violet-600/0 group-hover:bg-violet-600/10 transition-colors flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 pointer-events-none">
           <span className="bg-violet-600 text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">+ Add to DB</span>
         </div>
-      )}
+      ) : null}
       <CardOverlay status={status} />
     </div>
   )
@@ -192,7 +193,7 @@ function ScrapeModal({
 // ── Main ScraperTab ───────────────────────────────────────────────────────────
 let logCounter = 0
 
-export default function ScraperTab({ providers }: Props) {
+export default function ScraperTab({ providers, supabaseConfigured }: Props) {
   const [filter, setFilter] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
@@ -648,6 +649,7 @@ export default function ScraperTab({ providers }: Props) {
                         item={item}
                         status={cardStatuses.get(item.mangaId)}
                         onClick={() => setModal({ ...item, providerId: selectedId })}
+                        supabaseConfigured={supabaseConfigured}
                       />
                 ))}
               </div>

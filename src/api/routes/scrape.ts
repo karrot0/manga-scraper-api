@@ -178,15 +178,20 @@ scrapeRouter.post('/series', async (req: Request, res: Response) => {
       year: details.year ? parseInt(details.year) : undefined,
     }
 
-    // 2. Upsert series
-    log(`💾 Saving series "${rawTitle}" to database…`)
-    const saved = await upsertSeries(seriesData)
-    log(`✅ Series saved (id: ${saved.id})`, 'success')
-    sse(res, 'series', { id: saved.id, slug: saved.slug, title: rawTitle })
 
-    // 2a. Record this provider as a source for the series
-    await upsertSeriesSource({ series_id: saved.id, provider_id: providerId, provider_manga_id: mangaId })
-    log(`🔗 Source linked: ${providerId} → ${saved.id}`)
+    // 2. Upsert series (if supabase configured)
+    let saved: { id: string; slug: string } | null = null
+    if (supabase) {
+      log(`💾 Saving series "${rawTitle}" to database…`)
+      saved = await upsertSeries(seriesData)
+      log(`✅ Series saved (id: ${saved.id})`, 'success')
+      sse(res, 'series', { id: saved.id, slug: saved.slug, title: rawTitle })
+      // 2a. Record this provider as a source for the series
+      await upsertSeriesSource({ series_id: saved.id, provider_id: providerId, provider_manga_id: mangaId })
+      log(`🔗 Source linked: ${providerId} → ${saved.id}`)
+    } else {
+      log(`ℹ️ Skipping DB save (Supabase not configured)`, 'warn')
+    }
 
     // 3. Fetch chapters
     log(`📋 Fetching chapters…`)
@@ -291,7 +296,7 @@ scrapeRouter.post('/series', async (req: Request, res: Response) => {
     }
 
     // 5. Upsert chapters
-    if (dbChapters.length > 0) {
+    if (supabase && dbChapters.length > 0) {
       log(`💾 Saving ${dbChapters.length} chapters to database…`)
       const CHUNK = 100
       for (let i = 0; i < dbChapters.length; i += CHUNK) {

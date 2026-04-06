@@ -84,9 +84,9 @@ const GROUPS: EndpointGroup[] = [
       {
         id: 'manga-details',
         method: 'GET',
-        path: '/api/providers/:id/manga/*',
-        description: 'Manga metadata (pass full manga path after /manga/)',
-        pathParams: ['id'],
+        path: '/api/providers/:id/manga/:mangaId',
+        description: 'Manga metadata',
+        pathParams: ['id', 'mangaId'],
       },
       {
         id: 'chapters',

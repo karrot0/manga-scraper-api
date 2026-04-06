@@ -9,9 +9,9 @@ export const mangaRouter = Router()
  *
  * Note: mangaId may contain slashes (e.g. "some-manga/sub") — use wildcard param.
  */
-mangaRouter.get('/:id/manga/*', withProvider, asyncHandler(async (req, res) => {
+mangaRouter.get('/:id/manga/:mangaId', withProvider, asyncHandler(async (req, res) => {
   const provider = req.provider!
-  const mangaId = (req.params as any)[0] as string
+  const mangaId = req.params.mangaId as string
 
   const instance = provider.instance
   if (typeof instance.getMangaDetails !== 'function') {
