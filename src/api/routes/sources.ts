@@ -92,6 +92,11 @@ sourcesRouter.post('/find-sources', async (req: Request, res: Response) => {
 
   try {
     // 1. Fetch series from DB
+    if (!supabase) {
+      sse(res, 'error', { message: 'Database not configured' })
+      res.end()
+      return
+    }
     const { data: series, error: seriesErr } = await supabase
       .from('series')
       .select('id, slug, title, alt_titles')

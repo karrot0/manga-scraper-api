@@ -229,7 +229,7 @@ scrapeRouter.post('/series', async (req: Request, res: Response) => {
 
       providerChapIds.set(chapNum, chapId)
       dbChapters.push({
-        series_id: saved.id,
+        series_id: saved!.id,
         chapter_number: chapNum,
         volume_number: volNum,
         title: chapTitle,
@@ -310,7 +310,7 @@ scrapeRouter.post('/series', async (req: Request, res: Response) => {
         const { data: savedChapters } = await supabase
           .from('chapters')
           .select('id, chapter_number')
-          .eq('series_id', saved.id)
+          .eq('series_id', saved!.id)
 
         const sources: DbChapterSource[] = []
         for (const row of savedChapters ?? []) {
@@ -334,8 +334,8 @@ scrapeRouter.post('/series', async (req: Request, res: Response) => {
     }
 
     sse(res, 'done', {
-      seriesId: saved.id,
-      slug: saved.slug,
+      seriesId: saved!.id,
+      slug: saved!.slug,
       title: rawTitle,
       chaptersCount: dbChapters.length,
       pagesTotal,
@@ -354,6 +354,10 @@ scrapeRouter.post('/series', async (req: Request, res: Response) => {
 
 scrapeRouter.get('/exists/:slug', async (req: Request, res: Response) => {
   const { slug } = req.params
+  if (!supabase) {
+    res.json({ exists: false, series: null })
+    return
+  }
   const { data } = await supabase
     .from('series')
     .select('id, slug, title')
@@ -374,6 +378,10 @@ scrapeRouter.post('/batch-exists', async (req: Request, res: Response) => {
     return
   }
   const clean = (slugs as unknown[]).filter(s => typeof s === 'string').slice(0, 200) as string[]
+  if (!supabase) {
+    res.json({ found: [] })
+    return
+  }
   const { data } = await supabase.from('series').select('slug').in('slug', clean)
   res.json({ found: (data ?? []).map((r: any) => r.slug) })
 })
@@ -387,6 +395,11 @@ scrapeRouter.get('/series', async (req: Request, res: Response) => {
   const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) ?? '24', 10)))
   const search = ((req.query.search as string) ?? '').trim()
   const offset = (page - 1) * limit
+
+  if (!supabase) {
+    res.json({ items: [], total: 0, page, limit })
+    return
+  }
 
   let query = supabase
     .from('series')
@@ -436,6 +449,7 @@ scrapeRouter.post('/rescrape-all', async (req: Request, res: Response) => {
   try {
     // 1. Fetch all series (paginate to handle large libraries)
     const allSeries: Array<{ id: string; slug: string; title: string }> = []
+    if (!supabase) throw new Error('Database not configured')
     let page = 0
     const PAGE_SIZE = 100
     while (true) {
@@ -461,7 +475,7 @@ scrapeRouter.post('/rescrape-all', async (req: Request, res: Response) => {
         log(`🔄 [${processed + 1}/${allSeries.length}] "${series.title}"`)
 
         // 2. Get first available source
-        const { data: sources } = await supabase
+        const { data: sources } = await supabase!
           .from('series_sources')
           .select('provider_id, provider_manga_id')
           .eq('series_id', series.id)
@@ -541,7 +555,7 @@ scrapeRouter.post('/rescrape-all', async (req: Request, res: Response) => {
 
         if (newRawChapters.length === 0) {
           log(`  ✓ No new chapters`)
-          await supabase.from('series').update({ updated_at: new Date().toISOString() }).eq('id', series.id)
+          if (supabase) await supabase.from('series').update({ updated_at: new Date().toISOString() }).eq('id', series.id)
           processed++
           sse(res, 'progress', { current: processed, total: allSeries.length })
           continue
@@ -627,11 +641,13 @@ scrapeRouter.post('/rescrape-all', async (req: Request, res: Response) => {
 
         // 8a. Link chapter sources for new chapters
         if (scrapePages) {
-          const { data: savedChapters } = await supabase
-            .from('chapters')
-            .select('id, chapter_number')
-            .eq('series_id', series.id)
-            .in('chapter_number', dbChapters.map(c => c.chapter_number))
+          const { data: savedChapters } = supabase
+            ? await supabase
+                .from('chapters')
+                .select('id, chapter_number')
+                .eq('series_id', series.id)
+                .in('chapter_number', dbChapters.map(c => c.chapter_number))
+            : { data: [] }
 
           const sources: DbChapterSource[] = []
           for (const row of savedChapters ?? []) {
@@ -651,7 +667,7 @@ scrapeRouter.post('/rescrape-all', async (req: Request, res: Response) => {
         }
 
         // 9. Touch updated_at
-        await supabase.from('series').update({ updated_at: new Date().toISOString() }).eq('id', series.id)
+        if (supabase) await supabase.from('series').update({ updated_at: new Date().toISOString() }).eq('id', series.id)
 
         newChaptersTotal += dbChapters.length
         log(`  ✅ +${dbChapters.length} chapter(s)`, 'success')
@@ -682,6 +698,10 @@ scrapeRouter.delete('/series/:id', async (req: Request, res: Response) => {
   const { id } = req.params
 
   // Delete chapters first (if no cascade)
+  if (!supabase) {
+    res.status(503).json({ error: 'Database not configured' })
+    return
+  }
   await supabase.from('chapters').delete().eq('series_id', id)
 
   const { error } = await supabase.from('series').delete().eq('id', id)
